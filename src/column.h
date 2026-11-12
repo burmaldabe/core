@@ -12,7 +12,7 @@ enum column_type {
 };
 
 struct column_metadata {
-    enum column_type type_code;
+    enum column_type t;
     unsigned int parameter;
 };
 

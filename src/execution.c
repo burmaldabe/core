@@ -9,84 +9,92 @@
 #define LINE_BUFFER_SIZE 256
 #endif
 
-static const char *parsing_error_fmt(enum parsing_error err)
+static const char *get_parsing_status_log(enum parsing_status s)
 {
-    switch (err) {
+    switch (s) {
+    case parsing_success:
+        return NULL;
     case parsing_command_not_specified:
-        return "";
+        return NULL;
     case parsing_unknown_command:
-        return "%s: Unknown command\n";
+        return "%s: %s: Unknown command\n";
     case parsing_object_not_specified:
-        return "%s: Object not specified\n";
+        return "%s: %s: Object not specified\n";
     case parsing_unknown_object:
-        return "%s: %s: Unknown object\n";
+        return "%s: %s: %s: Unknown object\n";
     case parsing_name_not_specified:
-        return "%s: Name not specified\n";
+        return "%s: %s: Name not specified\n";
     case parsing_type_not_specified:
-        return "%s: Type not specified\n"; 
+        return "%s: %s: Type not specified\n"; 
     case parsing_unknown_type:
-        return "%s: %s: Unknown type\n";
+        return "%s: %s: %s: Unknown type\n";
     case parsing_parameter_not_specified:
-        return "%s: %s: Parameter not specified\n";
+        return "%s: %s: %s: Parameter not specified\n";
     case parsing_invalid_parameter_value:
-        return "%s: %s: Invalid parameter value\n";
+        return "%s: %s: %s: Invalid parameter value\n";
     }
     return NULL;
 }
 
-static const char *handling_error_str(enum handling_error err)
+static const char *get_handling_status_log(enum handling_status s)
 {
-    switch (err) {
+    switch (s) {
+    case handling_success:
+        return NULL;
     case handling_database_not_opened:
-        return "Database not opened\n";
+        return "%s: Database not opened\n";
     case handling_table_not_opened:
-        return "Table not opened\n";
+        return "%s: Table not opened\n";
     case handling_trying_to_open_column:
-        return "Trying to open column\n";
+        return "%s: Trying to open column\n";
     case handling_system_error:
         return NULL;
     }
     return NULL;
 }
 
-int execution_do(FILE *commands)
+static void handle_line(char buffer[], int size, struct context *ctx,
+    const char log_prefix[])
+{
+    struct command cmd;
+    enum parsing_status ps;
+    enum handling_status hs;
+    struct parsing_error_details ped;
+
+    if (buffer[size - 1] != 0) {
+        fprintf(stderr, "%s: Too long line", log_prefix);
+        fflush(stderr);
+        buffer[size - 1] = 0;
+        return;
+    }
+    ps = parsing_parse_command(buffer, &cmd, &ped);
+    if (ps != parsing_success) {
+        fprintf(stderr, get_parsing_status_log(ps), log_prefix,
+            ped.cmd_name, ped.arg_name);
+        fflush(stderr);
+        return;
+    }
+    hs = handling_handle_command(ctx, &cmd);
+    if (hs != handling_success) {
+        if (hs == handling_system_error)
+            perror(log_prefix);
+        else
+            fprintf(stderr, get_handling_status_log(hs), log_prefix);
+        fflush(stderr);
+        return;
+    }
+}
+
+enum execution_status execution_execute_commands(FILE *commands,
+    const char log_prefix[])
 {
     char line[LINE_BUFFER_SIZE];
     struct context ctx;
 
     CONTEXT_INIT(&ctx)
-    line[LINE_BUFFER_SIZE - 1] = 0;
-    while (fgets(line, LINE_BUFFER_SIZE, commands) != NULL) {
-        struct command cmd;
-        struct parsing_error_details ped;
-        enum handling_error he;
-        int error_occured;
-
-        if (line[LINE_BUFFER_SIZE - 1] != 0) {
-            fputs("Too long line", stderr);
-            fflush(stderr);
-            line[LINE_BUFFER_SIZE - 1] = 0;
-            continue;
-        }
-
-        error_occured = parsing(line, &cmd, &ped);
-        if (error_occured) {
-            fprintf(stderr, parsing_error_fmt(ped.code), ped.command_name,
-                ped.argument_name);
-            fflush(stderr);
-            continue;
-        }
-
-        error_occured = handling_do(&ctx, &cmd, &he);
-        if (error_occured) {
-            if (he == handling_system_error)
-                perror(NULL);
-            else
-                fputs(handling_error_str(he), stderr);
-            fflush(stderr);
-            continue;
-        }
-    }
+    line[sizeof(line) - 1] = 0;
+    while (fgets(line, sizeof(line), commands) != NULL)
+        handle_line(line, sizeof(line), &ctx, log_prefix);
     context_free(&ctx);
-    return ferror(commands) ? 1 : 0;
+    return ferror(commands) ? execution_system_error : execution_success;
 }

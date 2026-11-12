@@ -4,237 +4,238 @@
 #include <stdio.h>
 
 const char delim[] = " \t\n";
-const char open_command_name[] = "open";
-const char create_command_name[] = "create";
+const char open_cmd_name[] = "open";
+const char create_cmd_name[] = "create";
+const char delete_cmd_name[] = "delete";
 
-const char database_object_name[] = "database";
-const char table_object_name[] = "table";
-const char column_object_name[] = "column";
+const char database_obj_name[] = "database";
+const char table_obj_name[] = "table";
+const char column_obj_name[] = "column";
 
-static void fill_error_details(const char command_name[],
-    const char argument_name[], enum parsing_error code,
-    struct parsing_error_details *err)
+static void fill_error_details(const char cmd_name[],
+    const char arg_name[], struct parsing_error_details *err)
 {
     if (err != NULL) {
-        err->command_name = command_name;
-        err->argument_name = argument_name;
-        err->code = code;
+        err->cmd_name = cmd_name;
+        err->arg_name = arg_name;
     }
 }
 
-static int identified_command(const char name[], enum command_type *out)
+/* Returns -1 if the command is not identified. */
+static enum command_type identify_command(const char name[])
 {
-    if (0 == strcmp(name, open_command_name))
-        *out = command_type_open;
-    else if (0 == strcmp(name, create_command_name))
-        *out = command_type_create;
-    else
-        return 1;
-    return 0;
+    if (0 == strcmp(name, open_cmd_name))
+        return command_type_open;
+    if (0 == strcmp(name, create_cmd_name))
+        return command_type_create;
+    return -1;
 }
 
-static int identified_object(const char name[], enum command_object *out)
+/* Returns -1 if the object is not identified. */
+static enum command_object identify_object(const char name[])
 {
-    if (0 == strcmp(name, database_object_name))
-        *out = command_object_database;
-    else if (0 == strcmp(name, table_object_name))
-        *out = command_object_table;
-    else if (0 == strcmp(name, column_object_name))
-        *out = command_object_column;
-    else
-        return 1;
-    return 0;
+    if (0 == strcmp(name, database_obj_name))
+        return command_object_database;
+    if (0 == strcmp(name, table_obj_name))
+        return command_object_table;
+    if (0 == strcmp(name, column_obj_name))
+        return command_object_column;
+    return -1;
 }
 
-static int identified_column_type(const char name[], enum column_type *out)
+/* Returns -1 if the column type is not identified. */
+static enum column_type identify_column_type(const char name[])
 {
     if (0 == strcmp(name, "small-integer"))
-        *out = column_type_small_integer;
-    else if (0 == strcmp(name, "integer"))
-        *out = column_type_integer;
-    else if (0 == strcmp(name, "big-integer"))
-        *out = column_type_big_integer;
-    else if (0 == strcmp(name, "rational"))
-        *out = column_type_rational;
-    else if (0 == strcmp(name, "big-rational"))
-        *out = column_type_big_rational;
-    else if (0 == strcmp(name, "boolean"))
-        *out = column_type_boolean;
-    else if (0 == strcmp(name, "char"))
-        *out = column_type_char;
-    else
-        return 1;
-    return 0;
+        return column_type_small_integer;
+    if (0 == strcmp(name, "integer"))
+        return column_type_integer;
+    if (0 == strcmp(name, "big-integer"))
+        return column_type_big_integer;
+    if (0 == strcmp(name, "rational"))
+        return column_type_rational;
+    if (0 == strcmp(name, "big-rational"))
+        return column_type_big_rational;
+    if (0 == strcmp(name, "boolean"))
+        return column_type_boolean;
+    if (0 == strcmp(name, "char"))
+        return column_type_char;
+    return -1;
 }
 
-static int command_name_parsing(char line[], enum command_type *out,
-    struct parsing_error_details *err)
+static enum parsing_status parse_command_name(char line[],
+    enum command_type *out, struct parsing_error_details *err)
 {
-    const char *word;
-    enum command_type type_code;
-    int error_occured;
+    const char *cmd_name;
+    enum command_type cmd;
 
-    word = strtok(line, delim);
-    if (word == NULL) {
-        fill_error_details(NULL, NULL, parsing_command_not_specified, err);
-        return 1;
+    cmd_name = strtok(line, delim);
+    if (cmd_name == NULL) {
+        fill_error_details(NULL, NULL, err);
+        return parsing_command_not_specified;
     }
-
-    error_occured = identified_command(word, &type_code);
-    if (error_occured) {
-        fill_error_details(word, NULL, parsing_unknown_command, err);
-        return 1;
+    cmd = identify_command(cmd_name);
+    if ((int) cmd == -1) {
+        fill_error_details(cmd_name, NULL, err);
+        return parsing_unknown_command;
     }
-
-    *out = type_code;
-    return 0;
+    *out = cmd;
+    return parsing_success;
 }
 
-static int object_name_parsing(const char command_name[],
+static enum parsing_status parse_object_name(const char cmd_name[],
     enum command_object *out, struct parsing_error_details *err)
 {
-    const char *word;
-    enum command_object object_code;
-    int error_occured;
+    const char *obj_name;
+    enum command_object obj;
 
-    word = strtok(NULL, delim);
-    if (word == NULL) {
-        fill_error_details(command_name, NULL,
-            parsing_object_not_specified, err);
-        return 1;
+    obj_name = strtok(NULL, delim);
+    if (obj_name == NULL) {
+        fill_error_details(cmd_name, NULL, err);
+        return parsing_object_not_specified;
     }
-
-    error_occured = identified_object(word, &object_code);
-    if (error_occured) {
-        fill_error_details(command_name, word, parsing_unknown_object, err);
-        return 1;
+    obj = identify_object(obj_name);
+    if ((int) obj == -1) {
+        fill_error_details(cmd_name, obj_name, err);
+        return parsing_unknown_object;
     }
-
-    *out = object_code;
-    return 0;
+    *out = obj;
+    return parsing_success;
 }
 
-static int open_command_parsing(struct command_arguments_open *out,
-    struct parsing_error_details *err)
+static enum parsing_status parse_open_command(
+    struct command_arguments_open *out, struct parsing_error_details *err)
 {
     const char *name;
-    enum command_object object_code;
-    int error_occured;
+    enum command_object obj;
+    enum parsing_status s;
 
-    error_occured = object_name_parsing(open_command_name, &object_code,
-        err);
-    if (error_occured)
-        return 1;
-
+    s = parse_object_name(open_cmd_name, &obj, err);
+    if (s != parsing_success)
+        return s;
     name = strtok(NULL, delim);
     if (name == NULL) {
-        fill_error_details(open_command_name, NULL,
-            parsing_name_not_specified, err);
-        return 1;
+        fill_error_details(open_cmd_name, NULL, err);
+        return parsing_name_not_specified;
     }
-
     out->name = name;
-    out->object_code = object_code;
-    return 0;
+    out->obj = obj;
+    return parsing_success;
 }
 
-static int column_metadata_parsing(struct column_metadata *out,
-    struct parsing_error_details *err)
+static enum parsing_status parse_parameter(const char type_name[],
+    unsigned int *out, struct parsing_error_details *err)
+{
+    const char *raw;
+    unsigned int value;
+
+    raw = strtok(NULL, delim);
+    if (raw == NULL) {
+        fill_error_details(create_cmd_name, type_name, err);
+        return parsing_parameter_not_specified;
+    }
+    if (sscanf(raw, "%d", &value) != 1) {
+        fill_error_details(create_cmd_name, raw, err);
+        return parsing_invalid_parameter_value;
+    }
+    *out = value;
+    return parsing_success;
+}
+
+static enum parsing_status parse_column_metadata(
+    struct column_metadata *out, struct parsing_error_details *err)
 {
     const char *type_name;
-    enum column_type type_code;
-    int error_occured;
+    enum column_type t;
+    enum parsing_status s;
 
     type_name = strtok(NULL, delim);
     if (type_name == NULL) {
-        fill_error_details(create_command_name, NULL,
-            parsing_type_not_specified, err);
-        return 1;
+        fill_error_details(create_cmd_name, NULL, err);
+        return parsing_type_not_specified;
     }
-
-    error_occured = identified_column_type(type_name, &type_code);
-    if (error_occured) {
-        fill_error_details(create_command_name, type_name,
-            parsing_unknown_type, err);
-        return 1;
+    t = identify_column_type(type_name);
+    if ((int) t == -1) {
+        fill_error_details(create_cmd_name, type_name, err);
+        return parsing_unknown_type;
     }
-
-    if (type_code == column_type_char) {
-        const char *parameter = strtok(NULL, delim);
-        unsigned int value;
-        if (parameter == NULL) {
-            fill_error_details(create_command_name, type_name,
-                parsing_parameter_not_specified, err);
-            return 1;
-        }
-        if (sscanf(parameter, "%d", &value) != 1) {
-            fill_error_details(create_command_name, parameter,
-                parsing_invalid_parameter_value, err);
-            return 1;
-        }
-        out->parameter = value;
+    if (t == column_type_char) {
+        s = parse_parameter(type_name, &out->parameter, err);
+        if (s != parsing_success)
+            return s;
     } else
         out->parameter = 0;
-    out->type_code = type_code;
-
-    return 0;
+    out->t = t;
+    return parsing_success;
 }
 
-static int create_command_parsing(struct command_arguments_create *out,
-    struct parsing_error_details *err)
+static enum parsing_status parse_create_command(
+    struct command_arguments_create *out, struct parsing_error_details *err)
 {
     const char *name;
-    enum command_object object_code;
-    int error_occured;
+    enum command_object obj;
+    enum parsing_status s;
 
-    error_occured = object_name_parsing(create_command_name, &object_code,
-        err);
-    if (error_occured)
-        return 1;
-
+    s = parse_object_name(create_cmd_name, &obj, err);
+    if (s != parsing_success)
+        return s;
     name = strtok(NULL, delim);
     if (name == NULL) {
-        fill_error_details(create_command_name, NULL,
-            parsing_name_not_specified, err);
-        return 1;
+        fill_error_details(create_cmd_name, NULL, err);
+        return parsing_name_not_specified;
     }
-    
-    if (object_code == command_object_column) {
-        error_occured = column_metadata_parsing(&out->metadata_codes, err);
-        if (error_occured)
-            return 1;
+    if (obj == command_object_column) {
+        s = parse_column_metadata(&out->md, err);
+        if (s != parsing_success)
+            return s;
     }
-
     out->name = name;
-    out->object_code = object_code;
-    return 0;
+    out->obj = obj;
+    return parsing_success;
 }
 
-int parsing(char line[], struct command *out,
+static enum parsing_status parse_delete_command(
+    struct command_arguments_delete *out, struct parsing_error_details *err)
+{
+    const char *name;
+    enum command_object obj;
+    enum parsing_status s;
+
+    s = parse_object_name(create_cmd_name, &obj, err);
+    if (s != parsing_success)
+        return s;
+    name = strtok(NULL, delim);
+    if (name == NULL) {
+        fill_error_details(create_cmd_name, NULL, err);
+        return parsing_name_not_specified;
+    }
+    out->name = name;
+    out->obj = obj;
+    return parsing_success;
+}
+
+enum parsing_status parsing_parse_command(char line[], struct command *out,
     struct parsing_error_details *err)
 {
-    enum command_type type_code;
-    int error_occured;
+    enum command_type t;
+    enum parsing_status s;
 
-    error_occured = command_name_parsing(line, &type_code, err);
-    if (error_occured)
-        return 1;
-
-    switch (type_code) {
+    s = parse_command_name(line, &t, err);
+    if (s != parsing_success)
+        return s;
+    switch (t) {
     case command_type_open:
-        error_occured = open_command_parsing(
-            &out->arguments_passed.open_arguments, err);
+        s = parse_open_command(&out->args.open, err);
         break;
     case command_type_create:
-        error_occured = create_command_parsing(
-            &out->arguments_passed.create_arguments, err);
+        s = parse_create_command(&out->args.create, err);
         break;
     case command_type_delete:
+        s = parse_delete_command(&out->args.delete, err);
         break;
     }
-    if (error_occured)
-        return 1;
-
-    out->type_code = type_code;
-    return 0;
+    if (s != parsing_success)
+        return s;
+    out->t = t;
+    return parsing_success;
 }

@@ -1,4 +1,4 @@
-CFLAGS = -g -O0 -Wall
+CFLAGS = -g -O0 -Wall -Wextra
 TARGET = burmaldabe-core
 
 SOURCES = main.c execution.c context.c handling.c parsing.c

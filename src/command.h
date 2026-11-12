@@ -11,24 +11,24 @@ enum command_object {
 
 struct command_arguments_open {
     const char *name;
-    enum command_object object_code;
+    enum command_object obj;
 };
 
 struct command_arguments_create {
     const char *name;
-    enum command_object object_code;
-    struct column_metadata metadata_codes;
+    enum command_object obj;
+    struct column_metadata md;  /* In case the objects is a column. */
 };
 
 struct command_arguments_delete {
     const char *name;
-    enum command_object object_code;
+    enum command_object obj;
 };
 
 union command_arguments {
-    struct command_arguments_open open_arguments;
-    struct command_arguments_create create_arguments;
-    struct command_arguments_delete delete_arguments;
+    struct command_arguments_open open;
+    struct command_arguments_create create;
+    struct command_arguments_delete delete;
 };
 
 enum command_type {
@@ -37,9 +37,9 @@ enum command_type {
     command_type_delete
 };
 
-struct command  {
-    enum command_type type_code;
-    union command_arguments arguments_passed;
+struct command {
+    enum command_type t;
+    union command_arguments args;
 };
 
 #endif /* COMMAND_H_INCLUDED */

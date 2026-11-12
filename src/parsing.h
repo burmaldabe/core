@@ -3,7 +3,8 @@
 
 #include "command.h"
 
-enum parsing_error {
+enum parsing_status {
+    parsing_success,
     parsing_command_not_specified,
     parsing_unknown_command,
     parsing_object_not_specified,
@@ -16,12 +17,11 @@ enum parsing_error {
 };
 
 struct parsing_error_details {
-    const char *command_name;
-    const char *argument_name;
-    enum parsing_error code;
+    const char *cmd_name;
+    const char *arg_name;
 };
 
-int parsing(char line[], struct command *output,
+enum parsing_status parsing_parse_command(char line[], struct command *out,
     struct parsing_error_details *err);
 
 #endif /* PARSING_H_INCLUDED */
